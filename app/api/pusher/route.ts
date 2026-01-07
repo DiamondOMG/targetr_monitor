@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   await pusher.trigger(
-    "screen-" + body.screenId,
+    "monitor_screen",
     "player-event",
     body
   );

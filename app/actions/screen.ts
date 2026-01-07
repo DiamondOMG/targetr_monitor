@@ -1,4 +1,6 @@
-import { axios_targetr } from "../lib/axios";
+"use server";
+
+import { axios_targetr } from "../../lib/axios";
 
 interface PlaybackData {
   result: {
@@ -29,4 +31,8 @@ export async function playback_screen_by_id(screen_id: string) {
       blobId: resource?.data.blobId ?? null,
     };
   });
+}
+
+export async function getPlaybackForScreen(screenId: string) {
+  return await playback_screen_by_id(screenId);
 }

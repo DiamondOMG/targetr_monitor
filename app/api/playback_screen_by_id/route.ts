@@ -1,4 +1,4 @@
-import { playback_screen_by_id } from "../../../action/screen";
+import { playback_screen_by_id } from "../../actions/screen";
 
 export async function GET() {
   try {
