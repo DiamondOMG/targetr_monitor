@@ -3,9 +3,12 @@
 import { axios_targetr } from "../../lib/axios";
 
 interface PlaybackData {
+  data: {
+    screenId: string;
+  };
   result: {
     item: {
-      data: { libraryItemId: string };
+      data: { libraryItemId: string; label: string };
       resources: {
         data: { width: string; blobId: string };
       }[];
@@ -27,12 +30,30 @@ export async function playback_screen_by_id(screen_id: string) {
     const resource = entry.item.resources.find((r) => r.data.width === "200");
 
     return {
+      screenId: data.data.screenId,
       libraryItemId: entry.item.data.libraryItemId,
+      label: entry.item.data.label,
       blobId: resource?.data.blobId ?? null,
     };
   });
 }
 
-export async function getPlaybackForScreen(screenId: string) {
-  return await playback_screen_by_id(screenId);
+export async function bulk_data_update(
+  ids: string[],
+  dpop_endpoint: string,
+  dpop_type: string
+) {
+  const { data } = await axios_targetr.post(
+    "https://stacks.targetr.net/api/bulk-data-update",
+    {
+      type: "screen",
+      ids: ids,
+      data: {
+        dpopEndpoint: dpop_endpoint,
+        dpopType: dpop_type,
+      },
+    }
+  );
+
+  return data;
 }
