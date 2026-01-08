@@ -17,6 +17,6 @@ export async function POST(req: Request) {
     "player-event",
     body
   );
-
+  console.log(body);
   return Response.json({ success: true });
 }
