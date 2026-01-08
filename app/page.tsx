@@ -6,6 +6,7 @@ import { bulk_data_update, playback_screen_by_id } from "./actions/screen";
 
 export default function Home() {
   const [input_screens, set_input_screens] = useState<string>("");
+  const [is_loading, set_is_loading] = useState<boolean>(false);
   const [selected_screen, set_selected_screen] = useState<
     (typeof array_playback_screen)[0] | null
   >(null);
@@ -34,6 +35,7 @@ export default function Home() {
 
     if (ids.length === 0) return;
 
+    set_is_loading(true);
     try {
       // 1. Update dpop endpoint
       await bulk_data_update(
@@ -61,6 +63,8 @@ export default function Home() {
       set_input_screens(""); // Clear input after success
     } catch (error) {
       console.error("Error monitoring screens:", error);
+    } finally {
+      set_is_loading(false);
     }
   };
 
@@ -147,9 +151,36 @@ export default function Home() {
             <div className="flex gap-2 w-full sm:w-auto">
               <button
                 onClick={handle_load_screens}
-                className="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
+                disabled={is_loading || !input_screens.trim()}
+                className="flex-1 sm:flex-none bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors whitespace-nowrap disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Monitor Screens
+                {is_loading ? (
+                  <>
+                    <svg
+                      className="animate-spin h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  "Monitor Screens"
+                )}
               </button>
               {array_playback_screen.length > 0 && (
                 <button
