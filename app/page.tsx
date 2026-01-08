@@ -40,7 +40,7 @@ export default function Home() {
       // 1. Update dpop endpoint
       await bulk_data_update(
         ids,
-        "targetr-monitor.vercel.app/api/pusher",
+        "https://targetr-monitor.vercel.app/api/pusher",
         "SHORT"
       );
 
