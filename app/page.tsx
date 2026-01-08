@@ -40,7 +40,7 @@ export default function Home() {
       // 1. Update dpop endpoint
       await bulk_data_update(
         ids,
-        "https://6fb4de77e6de.ngrok-free.app/api/pusher",
+        "targetr-monitor.vercel.app/api/pusher",
         "SHORT"
       );
 
