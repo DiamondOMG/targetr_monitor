@@ -43,17 +43,26 @@ export async function bulk_data_update(
   dpop_endpoint: string,
   dpop_type: string
 ) {
-  const { data } = await axios_targetr.post(
-    "https://stacks.targetr.net/api/bulk-data-update",
-    {
-      type: "screen",
-      ids: ids,
-      data: {
-        dpopEndpoint: dpop_endpoint,
-        dpopType: dpop_type,
-      },
-    }
-  );
-
-  return data;
+  try {
+    const { data } = await axios_targetr.post(
+      "https://stacks.targetr.net/api/bulk-data-update",
+      {
+        type: "screen",
+        ids: ids,
+        data: {
+          dpopEndpoint: dpop_endpoint,
+          dpopType: dpop_type,
+        },
+      }
+    );
+    console.log("Bulk update success:", data);
+    return data;
+  } catch (error: any) {
+    console.error("Bulk update error:", {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
+    throw error;
+  }
 }

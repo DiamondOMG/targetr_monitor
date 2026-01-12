@@ -44,9 +44,10 @@ export default function Home() {
     set_is_loading(true);
     try {
       // 1. Update dpop endpoint
+      const dpop_url = `${window.location.origin}/api/pusher`;
       await bulk_data_update(
         ids,
-        "https://targetr-monitor.vercel.app/api/pusher",
+        dpop_url,
         "SHORT"
       );
 
