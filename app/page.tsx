@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Pusher from "pusher-js";
-import { bulk_data_update, playback_screen_by_id } from "./actions/screen";
+import { bulk_data_update } from "./actions/screen";
+import { playback } from "./actions/playback";
 
 export default function Home() {
   const [input_screens, set_input_screens] = useState<string>("");
@@ -11,10 +12,14 @@ export default function Home() {
   const [selected_screen, set_selected_screen] = useState<
     (typeof array_playback_screen)[0] | null
   >(null);
+  const [selected_download_screen, set_selected_download_screen] = useState<
+    (typeof array_playback_screen)[0] | null
+  >(null);
   const [array_playback_screen, set_array_playback_screen] = useState<
     {
       screen_id: string;
       last_library_item_id?: string;
+      played_items: string[];
       playback_list: {
         libraryItemId: string;
         blobId: string | null;
@@ -48,7 +53,7 @@ export default function Home() {
       // 2. Fetch playback data
       const all_playbacks = await Promise.all(
         ids.map(async (id) => {
-          const list = (await playback_screen_by_id(id)) as {
+          const list = (await playback(id)) as {
             screenId: string;
             libraryItemId: string;
             blobId: string | null;
@@ -57,6 +62,7 @@ export default function Home() {
           return {
             screen_id: id,
             playback_list: list,
+            played_items: [],
           };
         })
       );
@@ -120,10 +126,17 @@ export default function Home() {
               const match = s.playback_list.find(
                 (i) => i.libraryItemId === library_item_id
               );
+              
+              // Add to played_items if not already there
+              const updated_played_items = s.played_items.includes(library_item_id)
+                ? s.played_items
+                : [...s.played_items, library_item_id];
+
               return {
                 ...s,
                 last_library_item_id: library_item_id,
                 current_playback: match,
+                played_items: updated_played_items,
               };
             }
             return s;
@@ -230,12 +243,20 @@ export default function Home() {
               <div className="text-sm font-bold text-gray-800">
                 {screen.screen_id}
               </div>
-              <button
-                onClick={() => set_selected_screen(screen)}
-                className="text-[10px] bg-white border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors font-bold uppercase text-gray-600"
-              >
-                Playback
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => set_selected_screen(screen)}
+                  className="text-[10px] bg-white border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors font-bold uppercase text-gray-600"
+                >
+                  Playback
+                </button>
+                <button
+                  onClick={() => set_selected_download_screen(screen)}
+                  className="text-[10px] bg-white border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors font-bold uppercase text-blue-600"
+                >
+                  Check Download
+                </button>
+              </div>
             </div>
 
             <div className="aspect-video bg-gray-100 flex items-center justify-center relative">
@@ -339,6 +360,109 @@ export default function Home() {
             <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
               <button
                 onClick={() => set_selected_screen(null)}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold hover:bg-gray-300 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check Download Modal */}
+      {selected_download_screen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">
+                  Check Download Progress
+                </h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-gray-500 font-mono">
+                    {selected_download_screen.screen_id}
+                  </p>
+                  <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                    {
+                      (() => {
+                        const uniqueItems = Array.from(new Map(selected_download_screen.playback_list.map(item => [item.libraryItemId, item])).values());
+                        const playedCount = uniqueItems.filter(item => selected_download_screen.played_items.includes(item.libraryItemId)).length;
+                        return `${playedCount}/${uniqueItems.length}`;
+                      })()
+                    }
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => set_selected_download_screen(null)}
+                className="text-gray-400 hover:text-gray-600 p-2"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body: Scrollable Grid */}
+            <div className="p-6 overflow-y-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {Array.from(new Map(selected_download_screen.playback_list.map(item => [item.libraryItemId, item])).values()).map((item) => {
+                  const isPlayed = selected_download_screen.played_items.includes(item.libraryItemId);
+                  return (
+                    <div
+                      key={item.libraryItemId}
+                      className={`bg-white border rounded overflow-hidden flex flex-col transition-colors group ${isPlayed ? 'border-green-200' : 'border-gray-200 grayscale opacity-50'}`}
+                    >
+                      <div className="aspect-video bg-gray-100 flex items-center justify-center relative">
+                        {item.blobId ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={`https://d2cep6vins8x6z.blobstore.net/${item.blobId}`}
+                            alt={item.label}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <div className="text-[10px] text-gray-400">
+                            No Image
+                          </div>
+                        )}
+                        {isPlayed && (
+                          <div className="absolute top-1 right-1 bg-green-500 text-white p-0.5 rounded-full">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-2 bg-white flex-1 border-t text-left">
+                        <div className={`text-[10px] font-mono truncate mb-0.5 ${isPlayed ? 'text-green-600' : 'text-gray-400'}`}>
+                          {item.libraryItemId}
+                        </div>
+                        <div className={`text-[10px] truncate leading-tight ${isPlayed ? 'text-gray-800' : 'text-gray-400'}`}>
+                          {item.label}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+              <button
+                onClick={() => set_selected_download_screen(null)}
                 className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold hover:bg-gray-300 transition-colors"
               >
                 Close
