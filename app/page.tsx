@@ -6,6 +6,7 @@ import { bulk_data_update, playback_screen_by_id } from "./actions/screen";
 
 export default function Home() {
   const [input_screens, set_input_screens] = useState<string>("");
+  const [screens_event, set_screens_event] = useState<string[]>([]);
   const [is_loading, set_is_loading] = useState<boolean>(false);
   const [selected_screen, set_selected_screen] = useState<
     (typeof array_playback_screen)[0] | null
@@ -69,15 +70,18 @@ export default function Home() {
   };
 
   const handle_clear_screens = async () => {
-    const ids = array_playback_screen.map((s) => s.screen_id);
-    if (ids.length === 0) return;
+    if (screens_event.length === 0) {
+      set_array_playback_screen([]);
+      return;
+    }
 
     try {
-      // 1. Clear dpop endpoint
-      await bulk_data_update(ids, "", "");
+      // 1. Clear dpop endpoint using screens_event
+      await bulk_data_update(screens_event, "", "");
 
       // 2. Clear state
       set_array_playback_screen([]);
+      set_screens_event([]);
     } catch (error) {
       console.error("Error clearing screens:", error);
     }
@@ -105,6 +109,10 @@ export default function Home() {
         const screen_id = payload?.screenId;
 
         if (!library_item_id || !screen_id) return;
+
+        set_screens_event((prev) =>
+          prev.includes(screen_id) ? prev : [...prev, screen_id]
+        );
 
         set_array_playback_screen((prev) =>
           prev.map((s) => {
@@ -182,12 +190,12 @@ export default function Home() {
                   "Monitor Screens"
                 )}
               </button>
-              {array_playback_screen.length > 0 && (
+              {screens_event.length > 0 && (
                 <button
                   onClick={handle_clear_screens}
                   className="flex-1 sm:flex-none bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors whitespace-nowrap"
                 >
-                  Clear
+                  Clear ({screens_event.length})
                 </button>
               )}
             </div>
