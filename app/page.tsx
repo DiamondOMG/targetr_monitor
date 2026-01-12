@@ -44,12 +44,13 @@ export default function Home() {
     set_is_loading(true);
     try {
       // 1. Update dpop endpoint
-      const dpop_url = `${window.location.origin}/api/pusher`;
-      await bulk_data_update(
+      const response = await bulk_data_update(
         ids,
-        dpop_url,
+        "https://targetr-monitor.vercel.app/api/pusher",
         "SHORT"
       );
+      console.log("ids:", ids);
+      console.log("Bulk update response:", response);
 
       // 2. Fetch playback data
       const all_playbacks = await Promise.all(
