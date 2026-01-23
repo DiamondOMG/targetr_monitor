@@ -82,3 +82,25 @@ export async function axios_google_crud(
 
   return res.data;
 }
+
+/**
+ * ดึงข้อมูลจาก Sheet ผ่าน Google Sheets API v4 (ใช้ Service Account)
+ * จะได้ข้อมูลเป็น raw values (string ทั้งหมด) ไม่มีปัญหา type inference
+ * @param sheetName - ชื่อ Sheet
+ * @param range - Range ของข้อมูล (optional) ถ้าไม่ระบุจะดึงทั้ง Sheet
+ */
+export async function axios_google_get_raw(sheetName: string, range?: string, sheetId: string = GOOGLE_SHEET_ID) {
+  const token = await getAccessToken();
+  
+  // สร้าง range format: "SheetName" หรือ "SheetName!A1:Z1000"
+  const fullRange = range ? `${sheetName}!${range}` : sheetName;
+  const url = `${GOOGLE_CRUD_URL}/${sheetId}/values/${encodeURIComponent(fullRange)}?valueRenderOption=FORMATTED_VALUE`;
+
+  const res = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.data;
+}

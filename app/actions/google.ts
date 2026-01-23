@@ -1,6 +1,6 @@
 "use server";
 
-import { axios_google_get, axios_google_get_metadata, GOOGLE_SHEET_ID } from "@/lib/axios_google";
+import { axios_google_get, axios_google_get_metadata, axios_google_get_raw, GOOGLE_SHEET_ID } from "@/lib/axios_google";
 import { kv } from "@vercel/kv";
 
 const apiKey = process.env.GOOGLE_API_KEY || "";
@@ -33,6 +33,34 @@ function transformGoogleData(rawData: any) {
 }
 
 /**
+ * Helper สำหรับแปลงข้อมูลจาก Google Sheets API v4 (raw values) เป็น Array ของ Object
+ * ข้อมูลทั้งหมดจะเป็น string เพื่อหลีกเลี่ยงปัญหา type inference
+ */
+function transformRawSheetData(rawData: any) {
+  if (!rawData?.values || rawData.values.length < 1) return [];
+
+  // แถวแรกคือ header
+  const headers = rawData.values[0].map((h: any) => String(h || "").trim().toLowerCase());
+  const rows = rawData.values.slice(1);
+
+  return rows.map((row: any[]) => {
+    const item: any = {};
+    headers.forEach((header: string, i: number) => {
+      const value = row[i] !== undefined ? String(row[i]) : "";
+      if (header) {
+        item[header] = value;
+      } else if (value) {
+        item[`column_${i}`] = value;
+      }
+    });
+    return item;
+  }).filter((item: any) => {
+    const deviceValue = String(item.device || "").trim().toLowerCase();
+    return deviceValue === "screen" || deviceValue === "router";
+  });
+}
+
+/**
  * ฟังก์ชันหลักภายในสำหรับดึงข้อมูลจริงจาก Google
  */
 async function fetchFreshData() {
@@ -45,8 +73,9 @@ async function fetchFreshData() {
   await Promise.all(
     sheetNames.map(async (name: string) => {
       try {
-        const rawData = await axios_google_get(GOOGLE_SHEET_ID, name, "SELECT *", apiKey);
-        allData[name] = transformGoogleData(rawData);
+        // ใช้ Google Sheets API v4 แทน Visualization API เพื่อหลีกเลี่ยงปัญหา type inference
+        const rawData = await axios_google_get_raw(name);
+        allData[name] = transformRawSheetData(rawData);
       } catch (err) {
         console.error(`Error fetching sheet ${name}:`, err);
         allData[name] = [];
