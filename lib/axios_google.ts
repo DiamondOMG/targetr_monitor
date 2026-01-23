@@ -31,9 +31,23 @@ export async function axios_google_get(sheetId: string, sheetName: string, query
   const text = res.data;
 
   const jsonStr = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
-  const data = JSON.parse(jsonStr);
+  return JSON.parse(jsonStr);
+}
 
-  return data.table.rows;
+/**
+ * ดึง Metadata ของ Spreadsheet (เช่น รายชื่อ Sheet ทั้งหมด)
+ */
+export async function axios_google_get_metadata(sheetId: string = GOOGLE_SHEET_ID) {
+  const token = await getAccessToken();
+  const url = `${GOOGLE_CRUD_URL}/${sheetId}`;
+
+  const res = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return res.data;
 }
 
 /**
