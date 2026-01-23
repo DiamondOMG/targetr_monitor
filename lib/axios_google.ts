@@ -1,15 +1,18 @@
 import axios from "axios";
 import { JWT } from "google-auth-library";
-import keys from "./targetr_monitor_json_key.json";
 
 export const GOOGLE_SHEET_ID = "1FqkrWem-t83KALPVJ94jODKKrBwfuLhbsSJFzCQSy5w";
 export const GOOGLE_GET_URL = "https://docs.google.com/spreadsheets/d";
 export const GOOGLE_CRUD_URL = "https://sheets.googleapis.com/v4/spreadsheets";
 
+// ดึงค่าจาก .env และจัดการเรื่องตัวขึ้นบรรทัดใหม่ (\n) ใน Private Key
+const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "";
+const serviceAccountPrivateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+
 // สร้าง JWT client สำหรับ Service Account
 const client = new JWT({
-  email: keys.client_email,
-  key: keys.private_key,
+  email: serviceAccountEmail,
+  key: serviceAccountPrivateKey,
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 

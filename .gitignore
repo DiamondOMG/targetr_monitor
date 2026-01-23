@@ -39,5 +39,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-# secrets
-lib/targetr_monitor_json_key.json
+
