@@ -13,13 +13,22 @@ const CACHE_TTL = 15 * 60; // 15 นาที (หน่วยเป็นวิ
 function transformGoogleData(rawData: any) {
   if (!rawData?.table?.cols || !rawData?.table?.rows) return [];
 
-  const cols = rawData.table.cols.map((col: any) => col.label || "unknown");
   return rawData.table.rows.map((row: any) => {
     const item: any = {};
     row.c.forEach((cell: any, i: number) => {
-      item[cols[i]] = cell ? cell.v : null;
+      const label = (rawData.table.cols[i].label || "").trim().toLowerCase();
+      const value = cell ? cell.v : null;
+
+      if (!label && (value === null || value === "")) {
+        return;
+      }
+
+      item[label || `column_${i}`] = value;
     });
     return item;
+  }).filter((item: any) => {
+    const deviceValue = String(item.device || "").trim().toLowerCase();
+    return deviceValue === "screen" || deviceValue === "router";
   });
 }
 
@@ -30,7 +39,7 @@ async function fetchFreshData() {
   const metadata = await axios_google_get_metadata();
   const sheetNames = metadata.sheets
     .map((s: any) => s.properties.title)
-    .filter((title: string) => title !== "Read Me");
+    .filter((title: string) => title.startsWith("TopsDigital") || title.startsWith("Dear"));
 
   const allData: any = {};
   await Promise.all(
@@ -47,13 +56,23 @@ async function fetchFreshData() {
   return allData;
 }
 
-export async function google_get_all(sheetName: string, query: string = "SELECT *") {
+export async function google_get_sheet_raw(sheetName: string, query: string = "SELECT *") {
+  try {
+    const rawData = await axios_google_get(GOOGLE_SHEET_ID, sheetName, query, apiKey);
+    return { success: true, data: rawData };
+  } catch (error: any) {
+    console.error("Error in google_get_sheet_raw:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function google_get_sheet(sheetName: string, query: string = "SELECT *") {
   try {
     const rawData = await axios_google_get(GOOGLE_SHEET_ID, sheetName, query, apiKey);
     const rows = transformGoogleData(rawData);
     return { success: true, data: rows };
   } catch (error: any) {
-    console.error("Error in google_get_all:", error);
+    console.error("Error in google_get_sheet:", error);
     return { success: false, error: error.message };
   }
 }
