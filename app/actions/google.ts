@@ -1,36 +1,10 @@
 "use server";
 
-import { axios_google_get, axios_google_get_metadata, axios_google_get_raw, GOOGLE_SHEET_ID } from "@/lib/axios_google";
+import { axios_google_get_metadata, axios_google_api } from "@/lib/axios_google";
 import { kv } from "@vercel/kv";
 
-const apiKey = process.env.GOOGLE_API_KEY || "";
 const CACHE_KEY = "google_sheets_all_data";
 const CACHE_TTL = 15 * 60; // 15 นาที (หน่วยเป็นวินาที)
-
-/**
- * Helper สำหรับแปลงข้อมูลจาก Google Visualization API เป็น Array ของ Object
- */
-function transformGoogleData(rawData: any) {
-  if (!rawData?.table?.cols || !rawData?.table?.rows) return [];
-
-  return rawData.table.rows.map((row: any) => {
-    const item: any = {};
-    row.c.forEach((cell: any, i: number) => {
-      const label = (rawData.table.cols[i].label || "").trim().toLowerCase();
-      const value = cell ? cell.v : null;
-
-      if (!label && (value === null || value === "")) {
-        return;
-      }
-
-      item[label || `column_${i}`] = value;
-    });
-    return item;
-  }).filter((item: any) => {
-    const deviceValue = String(item.device || "").trim().toLowerCase();
-    return deviceValue === "screen" || deviceValue === "router";
-  });
-}
 
 /**
  * Helper สำหรับแปลงข้อมูลจาก Google Sheets API v4 (raw values) เป็น Array ของ Object
@@ -39,7 +13,6 @@ function transformGoogleData(rawData: any) {
 function transformRawSheetData(rawData: any) {
   if (!rawData?.values || rawData.values.length < 1) return [];
 
-  // แถวแรกคือ header
   const headers = rawData.values[0].map((h: any) => String(h || "").trim().toLowerCase());
   const rows = rawData.values.slice(1);
 
@@ -47,11 +20,8 @@ function transformRawSheetData(rawData: any) {
     const item: any = {};
     headers.forEach((header: string, i: number) => {
       const value = row[i] !== undefined ? String(row[i]) : "";
-      if (header) {
-        item[header] = value;
-      } else if (value) {
-        item[`column_${i}`] = value;
-      }
+      if (header) item[header] = value;
+      else if (value) item[`column_${i}`] = value;
     });
     return item;
   }).filter((item: any) => {
@@ -61,71 +31,47 @@ function transformRawSheetData(rawData: any) {
 }
 
 /**
- * ฟังก์ชันหลักภายในสำหรับดึงข้อมูลจริงจาก Google
+ * ดึงข้อมูลจาก Google Sheets ตามชื่อ Sheet
  */
-async function fetchFreshData() {
-  const metadata = await axios_google_get_metadata();
-  const sheetNames = metadata.sheets
-    .map((s: any) => s.properties.title)
-    .filter((title: string) => title.startsWith("TopsDigital") || title.startsWith("Dear"));
-
-  const allData: any = {};
-  await Promise.all(
-    sheetNames.map(async (name: string) => {
-      try {
-        // ใช้ Google Sheets API v4 แทน Visualization API เพื่อหลีกเลี่ยงปัญหา type inference
-        const rawData = await axios_google_get_raw(name);
-        allData[name] = transformRawSheetData(rawData);
-      } catch (err) {
-        console.error(`Error fetching sheet ${name}:`, err);
-        allData[name] = [];
-      }
-    })
-  );
-  return allData;
-}
-
-export async function google_get_sheet_raw(sheetName: string, query: string = "SELECT *") {
+export async function google_get_sheet(sheetName: string) {
   try {
-    const rawData = await axios_google_get(GOOGLE_SHEET_ID, sheetName, query, apiKey);
-    return { success: true, data: rawData };
-  } catch (error: any) {
-    console.error("Error in google_get_sheet_raw:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-export async function google_get_sheet(sheetName: string, query: string = "SELECT *") {
-  try {
-    const rawData = await axios_google_get(GOOGLE_SHEET_ID, sheetName, query, apiKey);
-    const rows = transformGoogleData(rawData);
+    const rawData = await axios_google_api({ range: sheetName });
+    const rows = transformRawSheetData(rawData);
     return { success: true, data: rows };
   } catch (error: any) {
-    console.error("Error in google_get_sheet:", error);
+    console.error(`Error in google_get_sheet (${sheetName}):`, error);
     return { success: false, error: error.message };
   }
 }
 
 /**
- * ดึงข้อมูลจากทุก Sheet พร้อมระบบ Cache ด้วย Vercel KV (Redis)
+ * ดึงข้อมูลจากทุก Sheet พร้อมระบบ Cache
  */
 export async function google_get_all_sheets_data() {
   try {
-    // 1. ลองดึงข้อมูลจาก Cache (Redis)
     const cachedData = await kv.get(CACHE_KEY);
-    if (cachedData) {
-      console.log("🚀 Serving from Vercel KV Cache");
-      return { success: true, data: cachedData, cached: true };
-    }
+    if (cachedData) return { success: true, data: cachedData, cached: true };
 
-    // 2. ถ้าไม่มีใน Cache ให้ดึงใหม่จาก Google
-    console.log("📡 Cache miss. Fetching fresh data from Google Sheets...");
-    const freshData = await fetchFreshData();
+    const metadata = await axios_google_get_metadata();
+    const sheetNames = metadata.sheets
+      .map((s: any) => s.properties.title)
+      .filter((title: string) => title.startsWith("TopsDigital") || title.startsWith("Dear"));
 
-    // 3. เก็บลง Cache พร้อมตั้งเวลาหมดอายุ (15 นาที)
-    await kv.set(CACHE_KEY, freshData, { ex: CACHE_TTL });
+    const allData: any = {};
+    await Promise.all(
+      sheetNames.map(async (name: string) => {
+        try {
+          const rawData = await axios_google_api({ range: name });
+          allData[name] = transformRawSheetData(rawData);
+        } catch (err) {
+          console.error(`Error fetching sheet ${name}:`, err);
+          allData[name] = [];
+        }
+      })
+    );
 
-    return { success: true, data: freshData, cached: false };
+    await kv.set(CACHE_KEY, allData, { ex: CACHE_TTL });
+    return { success: true, data: allData, cached: false };
   } catch (error: any) {
     console.error("Error in google_get_all_sheets_data:", error);
     return { success: false, error: error.message };
@@ -133,12 +79,11 @@ export async function google_get_all_sheets_data() {
 }
 
 /**
- * ฟังก์ชันสำหรับล้าง Cache ด้วยตัวเอง
+ * ล้าง Cache ข้อมูล Google Sheets
  */
 export async function clear_google_sheets_cache() {
   try {
     await kv.del(CACHE_KEY);
-    console.log("🧹 Cache cleared successfully");
     return { success: true, message: "Cache cleared" };
   } catch (error: any) {
     return { success: false, error: error.message };

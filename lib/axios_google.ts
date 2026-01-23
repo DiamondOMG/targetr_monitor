@@ -25,19 +25,6 @@ async function getAccessToken() {
 }
 
 /**
- * สำหรับ View ข้อมูลผ่าน Google Visualization API (ใช้ API Key)
- */
-export async function axios_google_get(sheetId: string, sheetName: string, query: string, apiKey: string) {
-  const url = `${GOOGLE_GET_URL}/${sheetId}/gviz/tq?tq=${encodeURIComponent(query)}&sheet=${encodeURIComponent(sheetName)}&key=${apiKey}&headers=1`;
-
-  const res = await axios.get(url, { responseType: 'text' });
-  const text = res.data;
-
-  const jsonStr = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
-  return JSON.parse(jsonStr);
-}
-
-/**
  * ดึง Metadata ของ Spreadsheet (เช่น รายชื่อ Sheet ทั้งหมด)
  */
 export async function axios_google_get_metadata(sheetId: string = GOOGLE_SHEET_ID) {
@@ -54,20 +41,41 @@ export async function axios_google_get_metadata(sheetId: string = GOOGLE_SHEET_I
 }
 
 /**
- * สำหรับ CRUD ข้อมูลผ่าน Google Sheets API v4 (ใช้ Service Account Access Token)
+ * ฟังก์ชัน Generic สำหรับติดต่อ Google Sheets API v4
+ * รองรับทั้ง GET (อ่าน), POST/PUT (เขียน), DELETE
  */
-export async function axios_google_crud(
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
-  range: string,
-  data: any = null,
-  sheetId: string = GOOGLE_SHEET_ID
-) {
+export async function axios_google_api({
+  method = "GET",
+  range,
+  data = null,
+  sheetId = GOOGLE_SHEET_ID,
+  valueRenderOption = "FORMATTED_VALUE", // สำหรับการอ่าน (GET)
+  valueInputOption = "USER_ENTERED",    // สำหรับการเขียน (POST/PUT)
+}: {
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  range: string;
+  data?: any;
+  sheetId?: string;
+  valueRenderOption?: "FORMATTED_VALUE" | "UNFORMATTED_VALUE" | "FORMULA";
+  valueInputOption?: "USER_ENTERED" | "RAW";
+}) {
   const token = await getAccessToken();
   
-  // เพิ่ม valueInputOption=USER_ENTERED สำหรับการเขียนข้อมูล เพื่อให้ Google แปลงข้อมูลตามรูปแบบ (เช่น วันที่ หรือ สูตร)
-  let url = `${GOOGLE_CRUD_URL}/${sheetId}/values/${range}`;
-  if (method === "POST" || method === "PUT") {
-    url += "?valueInputOption=USER_ENTERED";
+  // Google Sheets API v4: ถ้าชื่อ Sheet มีอักขระพิเศษ (เช่น - หรือ space) ต้องครอบด้วย single quotes
+  // รูปแบบ: 'Sheet Name'!A1:Z1000 หรือแค่ 'Sheet Name'
+  const formattedRange = range.includes("'") ? range : `'${range}'`;
+  let url = `${GOOGLE_CRUD_URL}/${sheetId}/values/${encodeURIComponent(formattedRange)}`;
+
+  const params = new URLSearchParams();
+  if (method === "GET") {
+    params.append("valueRenderOption", valueRenderOption);
+  } else if (method === "POST" || method === "PUT" || method === "PATCH") {
+    params.append("valueInputOption", valueInputOption);
+  }
+
+  const queryString = params.toString();
+  if (queryString) {
+    url += `?${queryString}`;
   }
 
   const res = await axios({
@@ -77,29 +85,8 @@ export async function axios_google_crud(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    data: data ? { values: data } : null, // รูปแบบข้อมูลของ Sheets API ต้องอยู่ใน object { values: [...] }
-  });
-
-  return res.data;
-}
-
-/**
- * ดึงข้อมูลจาก Sheet ผ่าน Google Sheets API v4 (ใช้ Service Account)
- * จะได้ข้อมูลเป็น raw values (string ทั้งหมด) ไม่มีปัญหา type inference
- * @param sheetName - ชื่อ Sheet
- * @param range - Range ของข้อมูล (optional) ถ้าไม่ระบุจะดึงทั้ง Sheet
- */
-export async function axios_google_get_raw(sheetName: string, range?: string, sheetId: string = GOOGLE_SHEET_ID) {
-  const token = await getAccessToken();
-  
-  // สร้าง range format: "SheetName" หรือ "SheetName!A1:Z1000"
-  const fullRange = range ? `${sheetName}!${range}` : sheetName;
-  const url = `${GOOGLE_CRUD_URL}/${sheetId}/values/${encodeURIComponent(fullRange)}?valueRenderOption=FORMATTED_VALUE`;
-
-  const res = await axios.get(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    // ถ้า method เป็น GET ไม่ต้องส่ง data
+    data: (method !== "GET" && data) ? { values: Array.isArray(data) ? data : [data] } : undefined,
   });
 
   return res.data;
