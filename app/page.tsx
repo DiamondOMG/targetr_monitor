@@ -15,6 +15,7 @@ export default function Home() {
   const [selected_download_screen, set_selected_download_screen] = useState<
     (typeof array_playback_screen)[0] | null
   >(null);
+  const [is_modal_full_screen, set_is_modal_full_screen] = useState<boolean>(false);
   const [array_playback_screen, set_array_playback_screen] = useState<
     {
       screen_id: string;
@@ -291,8 +292,12 @@ export default function Home() {
 
       {/* Playback Modal */}
       {selected_screen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className={`fixed inset-0 bg-black/50 z-50 flex items-center justify-center ${is_modal_full_screen ? 'p-0' : 'p-4'}`}>
+          <div className={`bg-white shadow-xl flex flex-col transition-all duration-300 ${
+            is_modal_full_screen 
+              ? 'w-full h-full rounded-none' 
+              : 'w-full max-w-4xl max-h-[90vh] rounded-lg'
+          }`}>
             {/* Modal Header */}
             <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
               <div>
@@ -303,29 +308,73 @@ export default function Home() {
                   {selected_screen.screen_id}
                 </p>
               </div>
-              <button
-                onClick={() => set_selected_screen(null)}
-                className="text-gray-400 hover:text-gray-600 p-2"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => set_is_modal_full_screen(!is_modal_full_screen)}
+                  className="text-gray-400 hover:text-gray-600 p-2"
+                  title={is_modal_full_screen ? "Exit Fullscreen" : "Fullscreen"}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+                  {is_modal_full_screen ? (
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 9L4 4m0 0l0 5m0-5l5 0m6 0l5 5m0-5l0 5m0-5l-5 0m-6 11l-5 5m0 0l0-5m0 5l5 0m6 0l5-5m0 5l0-5m0 5l-5 0"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                      />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    set_selected_screen(null);
+                    set_is_modal_full_screen(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 p-2"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Modal Body: Scrollable Grid */}
             <div className="p-6 overflow-y-auto">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <div className={`grid gap-4 ${
+                is_modal_full_screen 
+                  ? 'grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10' 
+                  : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'
+              }`}>
                 {selected_screen.playback_list.map((item, index) => (
                   <div
                     key={`${item.libraryItemId}-${index}`}
@@ -361,7 +410,10 @@ export default function Home() {
             {/* Modal Footer */}
             <div className="px-6 py-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
               <button
-                onClick={() => set_selected_screen(null)}
+                onClick={() => {
+                  set_selected_screen(null);
+                  set_is_modal_full_screen(false);
+                }}
                 className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold hover:bg-gray-300 transition-colors"
               >
                 Close
