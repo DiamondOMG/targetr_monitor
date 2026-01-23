@@ -28,7 +28,7 @@ async function getAccessToken() {
  * สำหรับ View ข้อมูลผ่าน Google Visualization API (ใช้ API Key)
  */
 export async function axios_google_get(sheetId: string, sheetName: string, query: string, apiKey: string) {
-  const url = `${GOOGLE_GET_URL}/${sheetId}/gviz/tq?tq=${encodeURIComponent(query)}&sheet=${encodeURIComponent(sheetName)}&key=${apiKey}`;
+  const url = `${GOOGLE_GET_URL}/${sheetId}/gviz/tq?tq=${encodeURIComponent(query)}&sheet=${encodeURIComponent(sheetName)}&key=${apiKey}&headers=1`;
 
   const res = await axios.get(url, { responseType: 'text' });
   const text = res.data;
