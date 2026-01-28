@@ -38,7 +38,7 @@ export async function playback(screen_id: string) {
  * ======================= */
 
 async function check_sequence_from_screen(screen: any): Promise<string> {
-  const data = screen.data || {};
+  const data = screen.dat || screen.data || {};
   const sequence_id = data.sequenceIdOverride || data.sequenceId;
 
   if (!sequence_id) {
@@ -57,6 +57,7 @@ type ResolvedItem = {
   libraryItemId: string;
   label: string;
   blobId: string | null;
+  condition: string | null;
 };
 
 /* =======================
@@ -64,7 +65,7 @@ type ResolvedItem = {
  * ======================= */
 
 function passTimeWindow(item: any, now = Date.now()): boolean {
-  const data = item.data || {};
+  const data = item.dat || item.data || {};
 
   const start =
     data.startMillis == null ? now : Number(data.startMillis);
@@ -76,7 +77,8 @@ function passTimeWindow(item: any, now = Date.now()): boolean {
 }
 
 function passCondition(item: any, screen: any): boolean {
-  const condition = item.data?.condition;
+  const itemData = item.dat || item.data || {};
+  const condition = itemData.condition;
   if (!condition) return true;
 
   function evalSimple(expr: string): boolean {
@@ -86,7 +88,8 @@ function passCondition(item: any, screen: any): boolean {
     if (!match) return false;
 
     const [, key, operator, expected] = match;
-    const actual = screen.data?.[key];
+    const screenData = screen.dat || screen.data || {};
+    const actual = screenData[key];
 
     if (actual == null) return false;
 
@@ -126,17 +129,33 @@ function itemPass(item: any, screen: any): boolean {
  * ======================= */
 
 function extractMediaInfo(item: any) {
-  const label = item.data?.label ?? null;
+  const itemData = item.dat || item.data || {};
+  const label = itemData.label ?? null;
+  const condition = itemData.condition ?? null;
 
   const blobId =
     item.resources?.find(
-      (r: any) =>
-        r.data?.blobId &&
-        (r.data?.contentType?.startsWith("video") ||
-         r.data?.contentType?.startsWith("image"))
-    )?.data?.blobId ?? null;
+      (r: any) => {
+        const resData = r.dat || r.data || {};
+        return (
+          resData.blobId &&
+          (resData.contentType?.startsWith("video") ||
+           resData.contentType?.startsWith("image"))
+        );
+      }
+    )?.dat?.blobId || 
+    item.resources?.find(
+      (r: any) => {
+        const resData = r.dat || r.data || {};
+        return (
+          resData.blobId &&
+          (resData.contentType?.startsWith("video") ||
+           resData.contentType?.startsWith("image"))
+        );
+      }
+    )?.data?.blobId || null;
 
-  return { label, blobId };
+  return { label, blobId, condition };
 }
 
 /* =======================
@@ -153,20 +172,22 @@ async function resolveItem(
   if (!itemPass(item, screen)) return null;
 
   // case: library item
-  if (item.data?.libraryItemId) {
-    const { label, blobId } = extractMediaInfo(item);
+  const itemData = item.dat || item.data || {};
+  if (itemData.libraryItemId) {
+    const { label, blobId, condition } = extractMediaInfo(item);
 
     return {
       screenId: screen.id,
-      libraryItemId: item.data.libraryItemId,
+      libraryItemId: itemData.libraryItemId,
       label,
       blobId,
+      condition,
     };
   }
 
   // case: inner sequence
-  if (item.data?.innerSequenceId) {
-    const innerSeq = await getSequenceById(item.data.innerSequenceId);
+  if (itemData.innerSequenceId) {
+    const innerSeq = await getSequenceById(itemData.innerSequenceId);
     return resolveInnerSequence(
       innerSeq,
       screen,
@@ -201,19 +222,21 @@ async function resolveInnerSequence(
 
     cursorMap[seqId] = (index + 1) % items.length;
 
-    if (item.data?.libraryItemId) {
-      const { label, blobId } = extractMediaInfo(item);
+    const itemData = item.dat || item.data || {};
+    if (itemData.libraryItemId) {
+      const { label, blobId, condition } = extractMediaInfo(item);
 
       return {
         screenId: screen.id,
-        libraryItemId: item.data.libraryItemId,
+        libraryItemId: itemData.libraryItemId,
         label,
         blobId,
+        condition,
       };
     }
 
-    if (item.data?.innerSequenceId) {
-      const nested = await getSequenceById(item.data.innerSequenceId);
+    if (itemData.innerSequenceId) {
+      const nested = await getSequenceById(itemData.innerSequenceId);
       const resolved = await resolveInnerSequence(
         nested,
         screen,
